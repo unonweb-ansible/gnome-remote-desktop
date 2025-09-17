@@ -1,5 +1,9 @@
 ---
 gnome_remote_desktop:
   user:
-  enable: true
-  view_only: false
+  dconf:
+    enable: true
+    view_only: false
+  service:
+    enabled: true
+    state: started

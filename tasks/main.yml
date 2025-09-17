@@ -79,16 +79,16 @@
       block:
 
       # enable
-      - name: Set /org/gnome/desktop/remote-desktop/rdp/enable to {{ gnome_remote_desktop.enable }}
+      - name: Set /org/gnome/desktop/remote-desktop/rdp/enable to {{ gnome_remote_desktop.dconf.enable }}
         community.general.dconf:
           key: /org/gnome/desktop/remote-desktop/rdp/enable
-          value: "{{ gnome_remote_desktop.enable }}"
+          value: "{{ gnome_remote_desktop.dconf.enable }}"
 
       # view only
-      - name: Set /org/gnome/desktop/remote-desktop/rdp/view-only to {{ gnome_remote_desktop.view_only }}
+      - name: Set /org/gnome/desktop/remote-desktop/rdp/view-only to {{ gnome_remote_desktop.dconf.view_only }}
         community.general.dconf:
           key: /org/gnome/desktop/remote-desktop/rdp/view-only
-          value: "{{ gnome_remote_desktop.view_only }}"
+          value: "{{ gnome_remote_desktop.dconf.view_only }}"
 
       # set path cert
       - name: /org/gnome/desktop/remote-desktop/rdp/tls-cert
@@ -108,6 +108,6 @@
       become_user: "{{ gnome_remote_desktop.user }}"
       ansible.builtin.systemd_service:
         name: gnome-remote-desktop.service
-        enabled: true
-        state: started
+        enabled: "{{ gnome_remote_desktop.service.enabled }}"
+        state: "{{ gnome_remote_desktop.service.state }}"
         scope: user

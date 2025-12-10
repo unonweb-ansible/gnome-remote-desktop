@@ -1,113 +1,116 @@
 ---
-# NOTES
-# -----
-# common name must be the "naked" hostname
-# in order to connect to the host, we need to resolve its IP in /etc/hosts
-
-# LINKS
-# -----
-# https://github.com/GNOME/gnome-remote-desktop
-# guide_selfsigned: https://docs.ansible.com/ansible/latest/collections/community/crypto/docsite/guide_selfsigned.html
-# openssl_csr_module: https://docs.ansible.com/ansible/latest/collections/community/crypto/openssl_csr_module.html
-# openssl_privatekey_module: https://docs.ansible.com/ansible/latest/collections/community/crypto/openssl_privatekey_module.html#ansible-collections-community-crypto-openssl-privatekey-module
-
 - name: gnome-remote-desktop role
   tags:
     - gnome-remote-desktop
   block:
 
-    # disable xrdp
-    - name: Disable xrdp.service
+  # disable xrdp
+  - name: Disable xrdp.service
+    become: true
+    failed_when: false
+    ansible.builtin.systemd_service:
+      name: xrdp.service
+      enabled: false
+      state: stopped
+      scope: system
+
+  # ssl cert
+  - block:
+
+    - name: Install python3-cryptography
       become: true
-      failed_when: false
-      ansible.builtin.systemd_service:
-        name: xrdp.service
-        enabled: false
-        state: stopped
-        scope: system
+      ansible.builtin.apt:
+        state: present
+        name: python3-cryptography
 
-    # ssl cert
-    - block:
-
-      - name: Install python3-cryptography
-        become: true
-        ansible.builtin.apt:
-          state: present
-          name: python3-cryptography
-
-      # mkdir
-      - name: Mkdir /home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop
-        become: true
-        ansible.builtin.file:
-          path: "/home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop"
-          state: directory
-          owner: "{{ gnome_remote_desktop.user }}"
-          group: "{{ gnome_remote_desktop.user }}"
-          mode: o=rwx,g=,o=rx
-
-      # key
-      - name: Create private key (RSA, 4096 bits)
-        become: true
-        become_user: "{{ gnome_remote_desktop.user }}"
-        community.crypto.openssl_privatekey:
-          path: "/home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop/rdp-tls.key"
-
-      # csr
-      - name: Create certificate signing request (CSR) for self-signed certificate
-        become: true
-        become_user: "{{ gnome_remote_desktop.user }}"
-        community.crypto.openssl_csr:
-          privatekey_path: "/home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop/rdp-tls.key" # The path to the private key to use when signing the certificate signing request.
-          common_name: "{{ inventory_hostname }}"
-          path: /tmp/gnome-remote-desktop.csr # The name of the file into which the generated OpenSSL certificate signing request will be written.
-          #subject_alt_name: IP:192.168.10.176;DNS:fk-mobil26.local
-          # DNS:fk-mobil02.local;UTF8:sarah@fk-mobil02;
-
-      # cert
-      - name: Create simple self-signed certificate
-        become: true
-        become_user: "{{ gnome_remote_desktop.user }}"
-        community.crypto.x509_certificate:
-          path: "/home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop/rdp-tls.crt"
-          privatekey_path: "/home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop/rdp-tls.key"
-          provider: selfsigned
-          csr_path: /tmp/gnome-remote-desktop.csr
-
-    # dconf
-    - become: true
-      become_user: "{{ gnome_remote_desktop.user }}"
-      block:
-
-      # enable
-      - name: Set /org/gnome/desktop/remote-desktop/rdp/enable to {{ gnome_remote_desktop.dconf.enable }}
-        community.general.dconf:
-          key: /org/gnome/desktop/remote-desktop/rdp/enable
-          value: "{{ gnome_remote_desktop.dconf.enable }}"
-
-      # view only
-      - name: Set /org/gnome/desktop/remote-desktop/rdp/view-only to {{ gnome_remote_desktop.dconf.view_only }}
-        community.general.dconf:
-          key: /org/gnome/desktop/remote-desktop/rdp/view-only
-          value: "{{ gnome_remote_desktop.dconf.view_only }}"
-
-      # set path cert
-      - name: /org/gnome/desktop/remote-desktop/rdp/tls-cert
-        community.general.dconf:
-          key: /org/gnome/desktop/remote-desktop/rdp/tls-cert
-          value: "'/home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop/rdp-tls.crt'"
-
-      # set path key
-      - name: /org/gnome/desktop/remote-desktop/rdp/tls-key
-        community.general.dconf:
-          key: /org/gnome/desktop/remote-desktop/rdp/tls-key
-          value: "'/home/{{ gnome_remote_desktop.user }}/.local/share/gnome-remote-desktop/rdp-tls.key'"
-
-    # start gnome-remote-desktop.service
-    - name: Start/Enable gnome-remote-desktop.service 
+    # mkdir
+    - name: Mkdir /home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop
       become: true
-      become_user: "{{ gnome_remote_desktop.user }}"
+      ansible.builtin.file:
+        path: "/home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop"
+        state: directory
+        owner: "{{ gnome_remote_desktop_user }}"
+        group: "{{ gnome_remote_desktop_user }}"
+        mode: o=rwx,g=,o=rx
+
+    # key
+    - name: Create private key (RSA, 4096 bits)
+      become: true
+      become_user: "{{ gnome_remote_desktop_user }}"
+      community.crypto.openssl_privatekey:
+        path: "/home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop/rdp-tls.key"
+
+    # csr
+    - name: Create certificate signing request (CSR) for self-signed certificate
+      become: true
+      become_user: "{{ gnome_remote_desktop_user }}"
+      community.crypto.openssl_csr:
+        privatekey_path: "/home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop/rdp-tls.key" # The path to the private key to use when signing the certificate signing request.
+        common_name: "{{ inventory_hostname }}"
+        path: /tmp/gnome-remote-desktop.csr # The name of the file into which the generated OpenSSL certificate signing request will be written.
+        #subject_alt_name: IP:192.168.10.176;DNS:fk-mobil26.local
+        # DNS:fk-mobil02.local;UTF8:sarah@fk-mobil02;
+
+    # cert
+    - name: Create simple self-signed certificate
+      become: true
+      become_user: "{{ gnome_remote_desktop_user }}"
+      community.crypto.x509_certificate:
+        path: "/home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop/rdp-tls.crt"
+        privatekey_path: "/home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop/rdp-tls.key"
+        provider: selfsigned
+        csr_path: /tmp/gnome-remote-desktop.csr
+
+  # dconf
+  - become: true
+    become_user: "{{ gnome_remote_desktop_user }}"
+    block:
+
+    # enable
+    - name: Set /org/gnome/desktop/remote-desktop/rdp/enable to {{ gnome_remote_desktop_dconf_enable }}
+      community.general.dconf:
+        key: /org/gnome/desktop/remote-desktop/rdp/enable
+        value: "{{ gnome_remote_desktop_dconf_enable }}"
+
+    # view only
+    - name: Set /org/gnome/desktop/remote-desktop/rdp/view-only to {{ gnome_remote_desktop_dconf_view_only }}
+      community.general.dconf:
+        key: /org/gnome/desktop/remote-desktop/rdp/view-only
+        value: "{{ gnome_remote_desktop_dconf_view_only }}"
+
+    # set path cert
+    - name: /org/gnome/desktop/remote-desktop/rdp/tls-cert
+      community.general.dconf:
+        key: /org/gnome/desktop/remote-desktop/rdp/tls-cert
+        value: "'/home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop/rdp-tls.crt'"
+
+    # set path key
+    - name: /org/gnome/desktop/remote-desktop/rdp/tls-key
+      community.general.dconf:
+        key: /org/gnome/desktop/remote-desktop/rdp/tls-key
+        value: "'/home/{{ gnome_remote_desktop_user }}/.local/share/gnome-remote-desktop/rdp-tls.key'"
+
+  # systemd
+  - block:
+
+    # enable
+    - when: gnome_remote_desktop_systemd_enable | length > 0
+      name: systemctl --user enable {{ gnome_remote_desktop_systemd_enable }}
+      become: true
+      become_user: "{{ gnome_remote_desktop_user }}"
+      loop: "{{ gnome_remote_desktop_systemd_enable }}"
       ansible.builtin.systemd_service:
-        name: gnome-remote-desktop.service
-        enabled: "{{ gnome_remote_desktop.service.enabled }}"
-        state: "{{ gnome_remote_desktop.service.state }}"
         scope: user
+        enabled: true
+        name: "{{ item }}"
+
+    # start
+    - when: gnome_remote_desktop_systemd_start | length > 0
+      name: systemctl --user start {{ gnome_remote_desktop_systemd_start }}
+      become: true
+      become_user: "{{ gnome_remote_desktop_user }}"
+      loop: "{{ gnome_remote_desktop_systemd_start }}"
+      ansible.builtin.systemd_service:
+        scope: user
+        state: started
+        name: "{{ item }}"
